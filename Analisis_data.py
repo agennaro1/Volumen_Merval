@@ -34,9 +34,9 @@ class SHDADataWorker(QThread):
     def __init__(self, host, dni, user, password, comitente):
         super().__init__()
         self.host = 123
-        self.dni = "111111111"
-        self.user = "uuuuuuuuuu"
-        self.password = "xxxxxxxxxx"
+        self.dni = "12345678"
+        self.user = "nnnnnnnnn"
+        self.password = "xxxxxxxxx"
         self.comitente = 12345
         self.hb = None
         self.is_running = True
@@ -576,11 +576,13 @@ class SHDAHomeBrokerApp(QMainWindow):
         super().__init__()
 
         # Configuración de conexión
-        self.host = 203
-        self.dni = "1234567"
-        self.user = "ttttttt5"
-        self.password = "xxxxxxx"
-        self.comitente = 76542
+        self.host = 123
+        self.dni = "12345678"
+        self.user = "nnnnnnnnn"
+        self.password = "xxxxxxxxx"
+        self.comitente = 12345
+        self.hb = None
+        self.is_running = True
 
         # Datos
         self.data_storage = {
@@ -605,7 +607,7 @@ class SHDAHomeBrokerApp(QMainWindow):
     def setup_ui(self):
         """Configurar interfaz de usuario"""
         self.setWindowTitle("Análisis de Mercado")
-        self.setGeometry(100, 150, 1800, 900)
+        self.setGeometry(100, 200, 1800, 900)
 
         # Widget central
         central_widget = QWidget()
@@ -620,17 +622,19 @@ class SHDAHomeBrokerApp(QMainWindow):
         # Botones
         self.fetch_btn = QPushButton("📊 Actualizar Datos")
         self.auto_update_checkbox = QCheckBox("Auto-actualizar")
+        self.auto_update_checkbox.setStyleSheet("color: #cccccc; font-style: regular;")
         self.auto_update_checkbox.setChecked(True)
 
         # Intervalo de actualización
         interval_label = QLabel("Intervalo (min):")
+        interval_label.setStyleSheet("color: #cccccc; font-style: regular;")
         self.interval_spinbox = QSpinBox()
         self.interval_spinbox.setRange(1, 60)
         self.interval_spinbox.setValue(3)
 
         # Info de zoom
         zoom_info = QLabel("💡 Usa la rueda del mouse para zoom, click izquierdo para pan, scrollbars para mover el gráfico.")
-        zoom_info.setStyleSheet("color: #888888; font-style: italic;")
+        zoom_info.setStyleSheet("color: #cccccc; font-style: regular;")
 
         # Agregar controles
         control_layout.addWidget(self.fetch_btn)
@@ -658,12 +662,16 @@ class SHDAHomeBrokerApp(QMainWindow):
         self.tables = {}
         self.plot_widgets = {}
 
+
+        
+
         tab_configs = [
             ('bluechips', '🔵 Bluechips'),
-            ('galpones', '🟡 Panel General'),
-            ('bonds', '🟢 Bonos'),
-            ('cedears', '🟠 CEDEARs'),
+            ('galpones', '🔵 Panel General'),
+            ('bonds', '🔵 Bonos'),
             ('short_term_bonds', '🔴 Letras'),
+            ('cedears', '🔴CEDEARs'),
+
         ]
 
         for key, title in tab_configs:
