@@ -677,6 +677,7 @@ class SHDAHomeBrokerApp(QMainWindow):
         for key, title in tab_configs:
             # Tabla
             table = QTableWidget()
+            table.setSortingEnabled(True)
             self.tables[key] = table
             self.tab_widget.addTab(table, title)
 
