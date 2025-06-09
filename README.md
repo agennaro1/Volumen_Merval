@@ -6,7 +6,7 @@
 
 ## Descripción
 
-La SHDA HomeBroker App es una aplicación de escritorio desarrollada con PyQt5 y Matplotlib, diseñada para monitorear y analizar datos de mercado en tiempo real obtenidos a través de la API de SHDA. Ofrece una interfaz de usuario interactiva para visualizar los datos de diferentes instrumentos (Bluechips, Bonos, CEDEARs, Letras y Panel General) en tablas y gráficos de burbujas dinámicos con funcionalidades de zoom y scroll.
+Esta es una aplicación de escritorio desarrollada con PyQt5 y Matplotlib, diseñada para monitorear y analizar datos de mercado en tiempo real obtenidos a través de la API de SHDA. Ofrece una interfaz de usuario interactiva para visualizar los datos de diferentes instrumentos (Bluechips, Bonos, CEDEARs, Letras y Panel General) en tablas y gráficos de burbujas dinámicos con funcionalidades de zoom y scroll.
 
 ## Características
 
