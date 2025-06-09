@@ -1,4 +1,4 @@
-# Graficador Volumen vs Cambio %
+# Graficador Volumen vs Variacion Diaria en %
 
 ![Python](https://img.shields.io/badge/Python-3.x-blue.svg)
 ![PyQt5](https://img.shields.io/badge/Qt-PyQt5-green.svg)
@@ -36,16 +36,9 @@ pip install PyQt5 matplotlib pandas numpy
 Además, esta aplicación utiliza la librería SHDA para interactuar con la API de SHDA. Deberás asegurarte de tener esta librería disponible y configurada correctamente con tus credenciales.
 
 Configuración y Uso
-Clonar el Repositorio:
-
-
-git clone [https://github.com/tu_usuario/tu_repositorio.git](https://github.com/tu_usuario/tu_repositorio.git)
-cd tu_repositorio
-
-(Reemplaza tu_usuario/tu_repositorio con la ruta real de tu repositorio.)
 
 ## Configurar Credenciales SHDA:
-Abre el archivo shda_homebroker_zoom.py y actualiza tus credenciales de SHDA en la clase SHDAHomeBrokerApp y SHDADataWorker:
+Abre el archivo Analisis_data.py y actualiza tus credenciales en las clases SHDAHomeBrokerApp y SHDADataWorker:
 
 Python
 
