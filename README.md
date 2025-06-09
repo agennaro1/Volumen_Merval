@@ -1,4 +1,4 @@
-# SHDA HomeBroker App
+# Graficador Volumen vs Cambio %
 
 ![Python](https://img.shields.io/badge/Python-3.x-blue.svg)
 ![PyQt5](https://img.shields.io/badge/Qt-PyQt5-green.svg)
