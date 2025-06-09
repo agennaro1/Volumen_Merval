@@ -136,6 +136,10 @@ class PlotWidget(QWidget):
         self.original_xlim = None
         self.original_ylim = None
         self.zoom_factor = 1.5
+        # --- NUEVAS PROPIEDADES PARA INTERACTIVIDAD ---
+        self.df = None
+        self.scatter = None
+        self.highlighted_info = None
         self.setup_ui()
 
     def setup_ui(self):
@@ -173,7 +177,6 @@ class PlotWidget(QWidget):
 
         layout.addWidget(main_plot_area)
 
-
         # Configurar estilo
         plt.style.use('dark_background')
 
@@ -185,7 +188,6 @@ class PlotWidget(QWidget):
 
         self.is_panning = False
         self.pan_start_point = None
-
 
         # Agregar botón de reset zoom
         self.reset_button = QPushButton("🔍 Reset Zoom")
@@ -283,6 +285,10 @@ class PlotWidget(QWidget):
     def on_click(self, event):
         """Manejar click del mouse para pan (arrastrar) o reset"""
         if event.button == 1:  # Left click for pan
+            # --- MODIFICACIÓN: Resetear resaltado al hacer clic en el fondo ---
+            if event.inaxes and not self.scatter.contains(event)[0]:
+                 self.highlight_symbol(None)
+
             self.is_panning = True
             self.pan_start_point = (event.xdata, event.ydata)
             self.canvas.setCursor(Qt.ClosedHandCursor)
@@ -334,6 +340,8 @@ class PlotWidget(QWidget):
             self.figure.clear()
             ax = self.figure.add_subplot(111)
             ax.set_facecolor('#2d2d2d')
+            self.scatter = None # Resetear scatter plot
+            self.highlighted_info = None
 
             if data is None or data.empty:
                 ax.text(0.5, 0.5, 'No hay datos disponibles',
@@ -345,11 +353,14 @@ class PlotWidget(QWidget):
             # Preparar datos
             df = self.prepare_data(data)
             if df is None or df.empty:
-                ax.text(0.5, 0.5, 'Error procesando datos',
+                ax.text(0.5, 0.5, 'No hay datos o no superan el filtro',
                        ha='center', va='center', transform=ax.transAxes,
                        fontsize=16, color='white')
                 self.canvas.draw_idle()
                 return
+            
+            df = df.reset_index(drop=True)
+            self.df = df # Guardar para referencia
 
             # Normalizar tamaños de burbujas
             if len(df) > 1:
@@ -364,24 +375,31 @@ class PlotWidget(QWidget):
                 normalized_sizes = [500]
 
             # Colores basados en variación
-            colors = []
+            face_colors_list = []
             for change in df['change']:
                 if change > 0:
-                    colors.append('#44ff44')  # Verde
+                    face_colors_list.append('#44ff44')  # Verde
                 elif change < 0:
-                    colors.append('#ff4444')  # Rojo
+                    face_colors_list.append('#ff4444')  # Rojo
                 else:
-                    colors.append('#ffffff')  # Blanco
+                    face_colors_list.append('#ffffff')  # Blanco
+
+            # --- CORRECCIÓN ---
+            # Se crean listas explícitas para los bordes y anchos.
+            # Esto asegura que cada punto tenga su propia propiedad editable.
+            num_points = len(df)
+            edge_colors_list = ['white'] * num_points
+            linewidths_list = [1.5] * num_points
 
             # Crear scatter plot
-            scatter = ax.scatter(
+            self.scatter = ax.scatter(
                 df['change'],
                 df['turnover'],
                 s=normalized_sizes,
-                c=colors,
+                c=face_colors_list,     # Se usa la lista de colores de relleno
                 alpha=0.7,
-                edgecolors='white',
-                linewidth=1.5
+                edgecolors=edge_colors_list, # Se usa la lista de colores de borde
+                linewidth=linewidths_list    # Se usa la lista de anchos de borde
             )
 
             # Agregar etiquetas para puntos importantes
@@ -400,7 +418,7 @@ class PlotWidget(QWidget):
             # Configurar ejes
             ax.set_xlabel('Variación Diaria (%)', fontsize=12, color='white')
             ax.set_ylabel('Volumen Operado', fontsize=12, color='white')
-            ax.set_title(f'{title}\n(Usar rueda del mouse para zoom, click izquierdo para pan, click medio para reset)',
+            ax.set_title(f'{title}\n(Click en tabla para resaltar símbolo)',
                         fontsize=14, color='white', pad=20)
 
             # Formatear eje Y
@@ -431,6 +449,68 @@ class PlotWidget(QWidget):
                    ha='center', va='center', transform=ax.transAxes,
                    fontsize=12, color='red')
             self.canvas.draw_idle()
+
+
+            
+    # --- NUEVO MÉTODO: Para resaltar un símbolo en el gráfico ---
+    def highlight_symbol(self, symbol_to_highlight):
+        """Resalta un punto en el gráfico correspondiente al símbolo."""
+        if self.scatter is None or self.df is None:
+            return
+
+        # 1. Resetear el punto previamente resaltado
+        if self.highlighted_info is not None:
+            idx = self.highlighted_info['index']
+            edgecolors = self.scatter.get_edgecolors()
+            linewidths = self.scatter.get_linewidths()
+            
+            if idx < len(edgecolors):
+                edgecolors[idx] = self.highlighted_info['edgecolor']
+                linewidths[idx] = self.highlighted_info['linewidth']
+                self.scatter.set_edgecolors(edgecolors)
+                self.scatter.set_linewidths(linewidths)
+            
+            self.highlighted_info = None
+
+        # 2. Encontrar y resaltar el nuevo punto
+        if symbol_to_highlight:
+            matches = self.df.index[self.df['symbol'] == symbol_to_highlight].tolist()
+            if not matches:
+                self.canvas.draw_idle()
+                return
+            
+            idx_to_highlight = matches[0]
+
+            edgecolors = self.scatter.get_edgecolors()
+            linewidths = self.scatter.get_linewidths()
+            facecolors = self.scatter.get_facecolors()
+
+            # Guardar propiedades originales antes de cambiarlas
+            self.highlighted_info = {
+                'index': idx_to_highlight,
+                'edgecolor': edgecolors[idx_to_highlight].copy(),
+                'linewidth': linewidths[idx_to_highlight]
+            }
+            
+            # Determinar el color de resaltado según el color de la burbuja
+            current_face_color = facecolors[idx_to_highlight]
+            green_rgba = QColor('#44ff44').getRgbF()
+            red_rgba = QColor('#ff4444').getRgbF()
+            
+            new_edge_color = 'yellow'  # Color por defecto
+            if np.allclose(current_face_color, green_rgba, atol=0.1):
+                new_edge_color = "#043B04"  # Verde Oscuro
+            elif np.allclose(current_face_color, red_rgba, atol=0.1):
+                new_edge_color = "#3F0505"  # Rojo Oscuro
+            
+            edgecolors[idx_to_highlight] = QColor(new_edge_color).getRgbF()
+            linewidths[idx_to_highlight] = 3.0
+
+            self.scatter.set_edgecolors(edgecolors)
+            self.scatter.set_linewidths(linewidths)
+
+        self.canvas.draw_idle()
+
 
     def prepare_data(self, df):
         """Preparar datos para graficar"""
@@ -569,6 +649,28 @@ class PlotWidget(QWidget):
             ax.set_ylim(new_y_start, new_y_start + current_height)
             self.canvas.draw_idle()
 
+class NumericTableWidgetItem(QTableWidgetItem):
+    """
+    Un QTableWidgetItem personalizado que permite un ordenamiento numérico correcto.
+    """
+    def __init__(self, text):
+        super().__init__(text)
+        self.value = None
+        try:
+            # Intenta convertir el texto a un número flotante para la comparación
+            self.value = float(text)
+        except (ValueError, TypeError):
+            # Si falla, se tratará como texto
+            pass
+
+    def __lt__(self, other):
+        # Sobrescribe el operador 'less than' para la clasificación
+        if self.value is not None and hasattr(other, 'value') and other.value is not None:
+            # Si ambos ítems tienen valores numéricos, compáralos
+            return self.value < other.value
+        # De lo contrario, utiliza la comparación de texto predeterminada
+        return self.text() < other.text()
+
 class SHDAHomeBrokerApp(QMainWindow):
     """Aplicación principal"""
 
@@ -633,7 +735,7 @@ class SHDAHomeBrokerApp(QMainWindow):
         self.interval_spinbox.setValue(3)
 
         # Info de zoom
-        zoom_info = QLabel("💡 Usa la rueda del mouse para zoom, click izquierdo para pan, scrollbars para mover el gráfico.")
+        zoom_info = QLabel("💡 Click en tabla para seleccionar. Rueda del mouse para zoom.")
         zoom_info.setStyleSheet("color: #cccccc; font-style: regular;")
 
         # Agregar controles
@@ -662,22 +764,20 @@ class SHDAHomeBrokerApp(QMainWindow):
         self.tables = {}
         self.plot_widgets = {}
 
-
-        
-
         tab_configs = [
             ('bluechips', '🔵 Bluechips'),
             ('galpones', '🔵 Panel General'),
             ('bonds', '🔵 Bonos'),
             ('short_term_bonds', '🔴 Letras'),
             ('cedears', '🔴CEDEARs'),
-
         ]
 
         for key, title in tab_configs:
             # Tabla
             table = QTableWidget()
             table.setSortingEnabled(True)
+            # --- NUEVA CONEXIÓN: Para la selección de items ---
+            table.cellClicked.connect(self.on_table_cell_clicked)
             self.tables[key] = table
             self.tab_widget.addTab(table, title)
 
@@ -745,6 +845,7 @@ class SHDAHomeBrokerApp(QMainWindow):
                 background-color: #2d2d2d;
                 color: white;
                 gridline-color: #3d3d3d;
+                selection-background-color: #5a5a5a;
             }
             QTableWidget::item {
                 padding: 4px;
@@ -753,55 +854,25 @@ class SHDAHomeBrokerApp(QMainWindow):
                 background-color: #3d3d3d;
                 color: white;
             }
-            QScrollBar:horizontal {
+            QScrollBar:horizontal, QScrollBar:vertical {
                 border: 1px solid #2d2d2d;
                 background: #1e1e1e;
+                width: 15px;
                 height: 15px;
                 margin: 0px 15px 0px 15px;
             }
-            QScrollBar::handle:horizontal {
+            QScrollBar::handle:horizontal, QScrollBar::handle:vertical {
                 background: #5d5d5d;
                 min-width: 20px;
-                border-radius: 5px;
-            }
-            QScrollBar::add-line:horizontal {
-                border: 1px solid #2d2d2d;
-                background: #3d3d3d;
-                width: 15px;
-                subcontrol-position: right;
-                subcontrol-origin: margin;
-            }
-            QScrollBar::sub-line:horizontal {
-                border: 1px solid #2d2d2d;
-                background: #3d3d3d;
-                width: 15px;
-                subcontrol-position: left;
-                subcontrol-origin: margin;
-            }
-            QScrollBar:vertical {
-                border: 1px solid #2d2d2d;
-                background: #1e1e1e;
-                width: 15px;
-                margin: 15px 0px 15px 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: #5d5d5d;
                 min-height: 20px;
                 border-radius: 5px;
             }
-            QScrollBar::add-line:vertical {
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 border: 1px solid #2d2d2d;
                 background: #3d3d3d;
+                width: 15px;
                 height: 15px;
-                subcontrol-position: bottom;
-                subcontrol-origin: margin;
-            }
-            QScrollBar::sub-line:vertical {
-                border: 1px solid #2d2d2d;
-                background: #3d3d3d;
-                height: 15px;
-                subcontrol-position: top;
-                subcontrol-origin: margin;
             }
         """)
 
@@ -834,14 +905,21 @@ class SHDAHomeBrokerApp(QMainWindow):
     def update_data(self, data_type, data):
         """Actualizar datos y visualizaciones"""
         try:
-            # Almacenar datos
-            self.data_storage[data_type] = data.copy()
+            # --- NUEVA MODIFICACIÓN: Filtrar por 'operations' ---
+            filtered_data = data.copy()
+            if 'operations' in filtered_data.columns:
+                # Convertir a numérico, los no-números serán NaN
+                filtered_data['operations'] = pd.to_numeric(filtered_data['operations'], errors='coerce')
+                # Mantener filas donde operations es un número y >= 1
+                filtered_data.dropna(subset=['operations'], inplace=True)
+                filtered_data = filtered_data[filtered_data['operations'] >= 1].copy()
 
-            # Actualizar tabla
-            self.update_table(data_type, data)
+            # Almacenar datos filtrados
+            self.data_storage[data_type] = filtered_data
 
-            # Actualizar gráfico
-            self.update_plot(data_type, data)
+            # Actualizar tabla y gráfico con los datos filtrados
+            self.update_table(data_type, filtered_data)
+            self.update_plot(data_type, filtered_data)
 
         except Exception as e:
             print(f"Error actualizando {data_type}: {e}")
@@ -851,36 +929,38 @@ class SHDAHomeBrokerApp(QMainWindow):
         """Actualizar tabla"""
         try:
             table = self.tables[data_type]
+            table.setSortingEnabled(False)
 
             if data is None or data.empty:
                 table.setRowCount(0)
                 table.setColumnCount(0)
+                table.setSortingEnabled(True)
                 return
 
-            # Configurar tabla
-            table.setRowCount(len(data))
-            table.setColumnCount(len(data.columns))
-            table.setHorizontalHeaderLabels(data.columns.tolist())
+            data_to_display = data.drop(columns=['settlement', 'group'], errors='ignore')
 
-            # Llenar tabla
-            for row_idx, (_, row) in enumerate(data.iterrows()):
+            table.setRowCount(len(data_to_display))
+            table.setColumnCount(len(data_to_display.columns))
+            table.setHorizontalHeaderLabels(data_to_display.columns.tolist())
+
+            for row_idx, (_, row) in enumerate(data_to_display.iterrows()):
                 for col_idx, value in enumerate(row):
-                    item = QTableWidgetItem(str(value))
+                    item = NumericTableWidgetItem(str(value))
 
-                    # Colorear celdas de variación
-                    if 'var' in data.columns[col_idx].lower() or 'change' in data.columns[col_idx].lower():
+                    if 'var' in data_to_display.columns[col_idx].lower() or 'change' in data_to_display.columns[col_idx].lower():
                         try:
                             val = float(value)
                             if val > 0:
                                 item.setBackground(QColor(68, 255, 68, 50))
                             elif val < 0:
                                 item.setBackground(QColor(255, 68, 68, 50))
-                        except:
+                        except (ValueError, TypeError):
                             pass
 
                     table.setItem(row_idx, col_idx, item)
 
             table.resizeColumnsToContents()
+            table.setSortingEnabled(True)
 
         except Exception as e:
             print(f"Error actualizando tabla {data_type}: {e}")
@@ -902,11 +982,54 @@ class SHDAHomeBrokerApp(QMainWindow):
 
         except Exception as e:
             print(f"Error actualizando gráfico {data_type}: {e}")
+    
+    # --- NUEVO MÉTODO: Manejador para el click en la tabla ---
+    def on_table_cell_clicked(self, row, column):
+        """Maneja el evento de click en una celda para sincronizar con el gráfico."""
+        try:
+            # 1. Identificar la tabla y el data_type correctos
+            current_table = self.sender()
+            if not isinstance(current_table, QTableWidget):
+                return
+            
+            data_type = None
+            for key, widget in self.tables.items():
+                if widget is current_table:
+                    data_type = key
+                    break
+            if not data_type:
+                return
+
+            # 2. Obtener el símbolo de la fila clickeada
+            # Busca la columna que contiene el identificador del activo
+            header_labels = [current_table.horizontalHeaderItem(i).text().lower() for i in range(current_table.columnCount())]
+            symbol_col_index = -1
+            possible_symbol_names = ['symbol', 'ticker', 'simbolo']
+            for name in possible_symbol_names:
+                if name in header_labels:
+                    symbol_col_index = header_labels.index(name)
+                    break
+            
+            if symbol_col_index == -1: return
+
+            symbol = current_table.item(row, symbol_col_index).text()
+
+            # 3. Activar el widget de gráfico correspondiente
+            plot_widget = self.plot_widgets[data_type]
+            self.plot_tab_widget.setCurrentWidget(plot_widget)
+
+            # 4. Llamar a la función para resaltar el símbolo
+            plot_widget.highlight_symbol(symbol)
+
+        except Exception as e:
+            print(f"Error al procesar el click en la tabla: {e}")
+            traceback.print_exc()
+
 
     def toggle_auto_update(self, enabled):
         """Activar/desactivar auto-actualización"""
         if enabled:
-            interval_ms = self.interval_spinbox.value() * 60 * 1000  # Convertir a ms
+            interval_ms = self.interval_spinbox.value() * 60 * 1000
             self.update_timer.start(interval_ms)
             self.connection_label.setText("Auto-actualización activa")
             self.connection_label.setStyleSheet("color: green")
