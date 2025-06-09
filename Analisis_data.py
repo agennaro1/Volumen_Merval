@@ -803,6 +803,7 @@ class SHDAHomeBrokerApp(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.status_bar.addPermanentWidget(self.progress_bar)
+        self.status_bar.setStyleSheet("color: #cccccc; font-style: regular;") 
 
         self.connection_label = QLabel("Desconectado")
         self.status_bar.addPermanentWidget(self.connection_label)
