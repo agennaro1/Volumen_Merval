@@ -766,12 +766,13 @@ class SHDAHomeBrokerApp(QMainWindow):
 
         tab_configs = [
             ('bluechips', '🔵 Bluechips'),
-            ('galpones', '🔵 Panel General'),
-            ('bonds', '🔵 Bonos'),
-            ('short_term_bonds', '🔴 Letras'),
-            ('cedears', '🔴CEDEARs'),
-        ]
+            ('galpones', '🟢 Panel General'),
+            ('bonds', '🟡 Bonos'),
+            ('short_term_bonds', '🟣 Letras'),
+            ('cedears', '🟠 CEDEARs')
+            ]
 
+      
         for key, title in tab_configs:
             # Tabla
             table = QTableWidget()
